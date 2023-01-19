@@ -29,8 +29,16 @@ class Database(object):
     def removeServeur(self, guildid):
         with mysql.connector.connect(**self.connection_params) as db:
             with db.cursor() as c:
-                request = "DELETE FROM serveurs WHERE guildID=%s; DELETE FROM joueurs WHERE guildID=%s"
-                params = [guildid, guildid]
+                request = "DELETE FROM serveurs WHERE guildID=%s ;"
+                params = [guildid]
+                c.execute(request, params)
+                db.commit()
+
+    def removeAllJoueurs(self, guildid):
+        with mysql.connector.connect(**self.connection_params) as db:
+            with db.cursor() as c:
+                request = "DELETE FROM joueurs WHERE guildID=%s ;"
+                params = [guildid]
                 c.execute(request, params)
                 db.commit()
 
