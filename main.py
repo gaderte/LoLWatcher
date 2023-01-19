@@ -185,12 +185,13 @@ async def on_guild_join(guild):
 @client.event
 async def on_guild_remove(guild):
     db.removeServeur(guild.id)
+    db.removeAllJoueurs(guild.id)
     return
 
 
 @client.event
-async def on_raw_member_remove(member):
-    db.RemoveJoueur(member.guild.id, member.id)
+async def on_raw_member_remove(payload):
+    db.RemoveJoueur(payload.guild_id, payload.user.id)
     return
 
 
