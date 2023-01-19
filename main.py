@@ -36,7 +36,9 @@ def displayInfo(player, guildid):
     temp = "Le joueur " + refreshedPlayer[1] + " est classé " + str(refreshedPlayer[2]) + " " + \
            str(refreshedPlayer[3]) + " avec " + str(refreshedPlayer[4]) + " LPs."
     if refreshedPlayer[5] == 1:
-        temp += "\nLe joueur est actuellement en BO : " + refreshedPlayer[6]
+        x = refreshedPlayer[6].replace('W', ":white_check_mark: ")\
+            .replace('L', ":no_entry_sign: ").replace('N', ":clock3: ")
+        temp += "\nLe joueur est actuellement en BO : " + x
     return temp
 
 
