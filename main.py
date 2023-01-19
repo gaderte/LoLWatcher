@@ -238,12 +238,14 @@ async def removeJoueur(ints):
 @client.tree.command(name="listejoueurs", description="Liste des joueurs")
 async def listeJoueurs(ints):
     res = db.GetJoueursOfGuild(ints.guild_id)
+    g = ints.guild
     retour = "Liste de(s) joueur(s) : \n"
     if not res:
         retour = "La liste des joueurs est vide"
     else:
         for i in db.GetJoueursOfGuild(ints.guild_id):
-            retour += " - " + i[1] + "\n"
+            m = await g.fetch_member(i[8])
+            retour += " - " + i[1] + " (" + m.name + ") \n"
         temp = retour.rsplit('\n', 1)
         retour = ''.join(temp)
     await ints.response.send_message(retour)
