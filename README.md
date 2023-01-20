@@ -2,7 +2,9 @@
 Bot Discord - LoL Watcher
 
 Requirements : discord.py, requests, mysql_connector_python
+
 Required Discord Perm = "Send Message"
+
 Host : SparkedHost
 
 Url to add (need Admin perm) : https://discord.com/api/oauth2/authorize?client_id=945415340324704277&permissions=2048&scope=bot
