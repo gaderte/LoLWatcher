@@ -19,7 +19,7 @@ How to use :
 if you kick or ban the bot => clear all players
 if a player leave your guild => clear from players list
 
-/!\ Try to not add more than 15 players per server. /!\
+/!\ Try to not add more than 15 players per server. /!\ 
 /!\ Before adding, make sure you finished your placements games /!\
 
 Contact me on Discord if needed : DRX Atlas#6180
