@@ -207,20 +207,31 @@ async def on_message(message):
 @client.tree.command(name="initialize", description="Initialise un nouveau serveur")
 async def initialize(ints, channelmessage: discord.TextChannel,
                      roleaping: discord.Role = None):
-    if not roleaping:
-        roleaping = 0
-        db.InitializeServer(ints.guild_id, channelmessage.id, roleaping)
+    try:
+        msg = "Message test. Si vous voyez ce message, cela signifie que le bot a l'autorisation d'écrire dans le " \
+              "channel. Vous pouvez le supprimer dès la fin de l'initialisation."
+        await channelmessage.send(msg)
+    except discord.errors.Forbidden:
+        msg = "Le bot n'a pas l'autorisation d'écrire dans le channel : " + channelmessage.name + \
+              ". Veuillez changer de channel ou accorder les autorisations avant de recommencer."
+        await ints.response.send_message(msg)
+        return
     else:
-        db.InitializeServer(ints.guild_id, channelmessage.id, roleaping.id)
-    await ints.response.send_message("Le serveur a bien été initialisé")
+        if not roleaping:
+            roleaping = 0
+            db.InitializeServer(ints.guild_id, channelmessage.id, roleaping)
+        else:
+            db.InitializeServer(ints.guild_id, channelmessage.id, roleaping.id)
+        await ints.response.send_message("Le serveur a bien été initialisé")
 
 
 @client.tree.command(name="addjoueur", description="S'ajouter dans la liste des joueurs")
 async def addJoueur(ints, nomjoueur: str):
     ret = addPlayer(nomjoueur, ints.guild, ints.user.id)
     if ret is None:
-        await ints.response.send_message("Erreur lors de l'ajout du joueur. Veuillez vérifier les logs pour plus"
-                                         " d'informations")
+        msg = "Erreur lors de l'ajout du joueur. Veuillez vérifier qu'il existe bien, qu'il est niveau 30 et qu'il" \
+              " a fini ses games de placements."
+        await ints.response.send_message(msg)
     elif ret == 1:
         await ints.response.send_message("Vous avez bien été ajouté à la liste.")
     elif ret == 2:
@@ -231,8 +242,11 @@ async def addJoueur(ints, nomjoueur: str):
 
 @client.tree.command(name="leavelolwatcher", description="Se retirer de la liste des joueurs")
 async def removeJoueur(ints):
-    db.RemoveJoueur(ints.guild_id, ints.user.id)
-    await ints.response.send_message("Vous avez été retiré de la liste")
+    res = db.RemoveJoueur(ints.guild_id, ints.user.id)
+    if res == 1:
+        await ints.response.send_message("Vous avez été retiré de la liste")
+    else:
+        await ints.response.send_message("Vous n'êtes pas présent dans la liste")
 
 
 @client.tree.command(name="listejoueurs", description="Liste des joueurs")
@@ -266,6 +280,10 @@ async def on_update():
                 print(i[1] + " n'a pas joué de partie")
             else:
                 retour += "\n" + displayInfo(i, g[0])
-                await channel.send(str(retour))
+                try:
+                    await channel.send(str(retour))
+                except discord.errors.Forbidden:
+                    print("Error guild '" + g[1] + "' : Le bot n'a pas le droit d'écrire dans le channel initialisé.")
+
 
 client.run(TOKEN)
