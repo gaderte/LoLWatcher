@@ -7,7 +7,30 @@ Required Discord Perm = "Send Message"
 
 Host : SparkedHost
 
-Url to add (need Admin perm) : https://discord.com/api/oauth2/authorize?client_id=945415340324704277&permissions=2048&scope=bot
+Url to add the bot (need Admin perm) : https://discord.com/api/oauth2/authorize?client_id=945415340324704277&permissions=2048&scope=bot
+
+French :
+
+Comment utiliser le bot :
+  - Il faut impérativement aller dans les paramètres du serveur => Intégrations => LoLWatcher et changer les permissions des commandes.
+  - Lancer la commande "initialize" pour setup le bot. Il y a deux paramètres dont 1 facultatif :
+    - "channelmessage" : le channel où seront envoyés les messages concernant l'elo
+    - "roleaping" (facultatif) : le rôle qui sera ping à chaque nouvelle notification. Laissez vide si pas de role
+  - Un membre peut utiliser la commande "addjoueur" pour s'ajouter dans la liste (1 compte LoL par membre)
+  - Un membre peut utiliser la commande "leavelolwatcher" pour se retirer de la liste
+  - La commande "listjoueurs" permet d'afficher tous les joueurs inscrits sur votre serveur
+
+Si un joueur est kick ou ban du serveur, le bot clear automatiquement son compte
+Si le bot est kick ou ban du serveur, il clear automatiquement tous les comptes associés
+
+/!\ La clé étant limité en requête, essayez de ne pas ajouter + de 15 joueurs par serveur /!\
+
+/!\ Avant d'ajouter un joueur, soyez sûr que le pseudo est bien orthographié et que le joueur a fini ses games de placements /!\
+
+Contactez moi sur Discord au besoin : DRX Atlas#6180
+
+
+English :
 
 How to use :
   - Go to Guild params and change slash commands permissions to secure bot usage
