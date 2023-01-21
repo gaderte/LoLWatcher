@@ -62,6 +62,7 @@ class Database(object):
                 params = [guildid, member_id]
                 c.execute(request, params)
                 db.commit()
+                return c.rowcount
 
     def recoverSpecificJoueur(self, idjoueur, guildid):
         with mysql.connector.connect(**self.connection_params) as db:
@@ -84,7 +85,7 @@ class Database(object):
     def recoverAllGuilds(self):
         with mysql.connector.connect(**self.connection_params) as db:
             with db.cursor() as c:
-                request = "SELECT * FROM serveurs"
+                request = "SELECT * FROM serveurs WHERE channelIdMessage != 0"
                 c.execute(request)
                 results = c.fetchall()
                 return results
