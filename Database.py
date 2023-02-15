@@ -97,3 +97,22 @@ class Database(object):
                 c.execute(request)
                 resultats = c.fetchall()
                 return resultats
+
+    def GetPlayerInfo(self, guildid, summonername):
+        with mysql.connector.connect(**self.connection_params) as db:
+            with db.cursor(buffered=True) as c:
+                request = "SELECT * FROM joueurs WHERE guildID=%s and SummonerName=%s"
+                params = [guildid, summonername]
+                c.execute(request, params)
+                result = c.fetchone()
+                return result
+
+    def GetPlayerInfoDiscord(self, guildid, discordid):
+        with mysql.connector.connect(**self.connection_params) as db:
+            with db.cursor(buffered=True) as c:
+                request = "SELECT * FROM joueurs WHERE guildID=%s and memberID=%s"
+                params = [guildid, discordid]
+                c.execute(request, params)
+                result = c.fetchone()
+                return result
+
