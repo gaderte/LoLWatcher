@@ -115,14 +115,14 @@ def check_rang(player, guild):
                 return "RAS"
             if typequeue.get('tier') != atmelo.get("tier") \
                     and tiers.get(typequeue.get('tier')) < tiers.get(atmelo.get("tier")):
-                ret += str(atmelo.get('summonername')) + " a derank de " + atmelo.get('tier') + " à " \
+                ret += str(typequeue.get('summonerName')) + " a derank de " + atmelo.get('tier') + " à " \
                        + typequeue.get('tier')
                 db.updateJoueur(player[0], typequeue.get('summonerName'), typequeue.get('tier'), typequeue.get('rank'),
                                 typequeue.get('leaguePoints'), atmelo.get("enBo"), atmelo.get("progress"))
                 return ret
             if typequeue.get('tier') != atmelo.get("tier") \
                     and tiers.get(typequeue.get('tier')) > tiers.get(atmelo.get("tier")):
-                ret += str(atmelo.get('summonername')) + " a rank up de " + atmelo.get('tier') + " à " \
+                ret += str(typequeue.get('summonerName')) + " a rank up de " + atmelo.get('tier') + " à " \
                        + typequeue.get('tier')
                 db.updateJoueur(player[0], typequeue.get('summonerName'), typequeue.get('tier'), typequeue.get('rank'),
                                 typequeue.get('leaguePoints'), atmelo.get("enBo"), atmelo.get("progress"))
@@ -130,7 +130,7 @@ def check_rang(player, guild):
 
             if typequeue.get('rank') != atmelo.get("rank") \
                     and ranks.get(typequeue.get('rank')) < ranks.get(atmelo.get("rank")):
-                ret += str(atmelo.get('summonername')) + " est descendu de " + atmelo.get("tier") + ' ' + \
+                ret += str(typequeue.get('summonerName')) + " est descendu de " + atmelo.get("tier") + ' ' + \
                        atmelo.get("rank") \
                        + " à " + typequeue.get('tier') + ' ' + typequeue.get('rank')
                 db.updateJoueur(player[0], typequeue.get('summonerName'), typequeue.get('tier'), typequeue.get('rank'),
@@ -138,7 +138,7 @@ def check_rang(player, guild):
                 return ret
             if typequeue.get('rank') != atmelo.get("rank") \
                     and ranks.get(typequeue.get('rank')) > ranks.get(atmelo.get("rank")):
-                ret += str(atmelo.get('summonername')) + " est monté de " + atmelo.get("tier") + ' ' + \
+                ret += str(typequeue.get('summonerName')) + " est monté de " + atmelo.get("tier") + ' ' + \
                        atmelo.get("rank") \
                        + " à " + typequeue.get('tier') + ' ' + typequeue.get('rank')
                 db.updateJoueur(player[0], typequeue.get('summonerName'), typequeue.get('tier'), typequeue.get('rank'),
@@ -146,13 +146,13 @@ def check_rang(player, guild):
                 return ret
 
             if typequeue.get('leaguePoints') != atmelo.get("lps") and typequeue.get('leaguePoints') < atmelo.get("lps"):
-                ret += str(atmelo.get('summonername')) + " a perdu -" + \
+                ret += str(typequeue.get('summonerName')) + " a perdu -" + \
                        str(atmelo.get("lps") - typequeue.get('leaguePoints')) + " LPs"
                 db.updateJoueur(player[0], typequeue.get('summonerName'), typequeue.get('tier'), typequeue.get('rank'),
                                 typequeue.get('leaguePoints'), atmelo.get("enBo"), atmelo.get("progress"))
                 return ret
             if typequeue.get('leaguePoints') != atmelo.get("lps") and typequeue.get('leaguePoints') > atmelo.get("lps"):
-                ret += str(atmelo.get('summonername')) + " a gagné +" + \
+                ret += str(typequeue.get('summonerName')) + " a gagné +" + \
                        str(typequeue.get('leaguePoints') - atmelo.get("lps")) + " LPs"
                 db.updateJoueur(player[0], typequeue.get('summonerName'), typequeue.get('tier'), typequeue.get('rank'),
                                 typequeue.get('leaguePoints'), atmelo.get("enBo"), atmelo.get("progress"))
@@ -251,6 +251,7 @@ async def removeJoueur(ints):
 
 @client.tree.command(name="listejoueurs", description="Liste des joueurs")
 async def listeJoueurs(ints):
+    await ints.response.defer()
     res = db.GetJoueursOfGuild(ints.guild_id)
     g = ints.guild
     retour = "Liste de(s) joueur(s) : \n"
@@ -262,10 +263,67 @@ async def listeJoueurs(ints):
             retour += " - " + i[1] + " (" + m.name + ") \n"
         temp = retour.rsplit('\n', 1)
         retour = ''.join(temp)
-    await ints.response.send_message(retour)
+    await ints.followup.send(retour)
 
 
-@tasks.loop(minutes=2.0)
+@client.tree.command(name="infojoueur", description="Donne les infos d'un joueur")
+async def info_joueur(ints, summonername: str):
+    await ints.response.defer()
+    p = db.GetPlayerInfo(ints.guild_id, summonername)
+    if p:
+        temp = "Le joueur " + p[1] + " est classé " + str(p[2]) + " " + \
+               str(p[3]) + " avec " + str(p[4]) + " LPs."
+        if p[5] == 1:
+            x = p[6].replace('W', ":white_check_mark: ").replace('L', ":no_entry_sign: ").replace('N', ":clock3: ")
+            temp += "\nLe joueur est actuellement en BO : " + x
+        await ints.followup.send(temp)
+    else:
+        temp = "Erreur lors de la récupération du joueur. Veuillez vérifier qu'il existe bien"
+        await ints.followup.send(temp)
+
+
+@client.tree.command(name="infojoueurdiscord", description="Donne les infos d'un joueur")
+async def info_joueur_discord(ints, membre: discord.Member):
+    await ints.response.defer()
+    p = db.GetPlayerInfoDiscord(ints.guild_id, membre.id)
+    if p:
+        temp = "Le joueur " + p[1] + " est classé " + str(p[2]) + " " + \
+               str(p[3]) + " avec " + str(p[4]) + " LPs."
+        if p[5] == 1:
+            x = p[6].replace('W', ":white_check_mark: ").replace('L', ":no_entry_sign: ").replace('N', ":clock3: ")
+            temp += "\nLe joueur est actuellement en BO : " + x
+        await ints.followup.send(temp)
+    else:
+        temp = "Erreur lors de la récupération du joueur. Veuillez vérifier qu'il existe bien"
+        await ints.followup.send(temp)
+
+
+@client.tree.command(name="alert", description="Alerte tous les utilisateurs du bot")
+async def alertGuilds(ints, message: str):
+    if ints.user.id != admin_atlas_id:
+        await ints.response.send_message("Seul l'administrateur peut utiliser cette commande")
+        return
+    await ints.response.defer()
+    for g in db.recoverAllGuilds():
+        channel = client.get_channel(g[2])
+        try:
+            await channel.send("Message de l'admin : \n>>> " + message)
+        except Exception as e:
+            print(e)
+    await ints.followup.send("L'alerte a bien été envoyée")
+
+
+@client.tree.command(name="alertadmin", description="Alerte l'administrateur d'un(e) potentiel(le) problème/demande")
+async def alert_admin(ints, message: str):
+    await ints.response.defer()
+    atlas = await client.fetch_user(admin_atlas_id)
+    ret = "<@" + str(ints.user.id) + "> vous a envoyé un meesage : \n\n" + message
+    await atlas.send(ret)
+    await ints.followup.send("Votre message a bien été envoyé. Vous serez recontacté sous peu."
+                             " Merci de ne pas spam la commande")
+
+
+@tasks.loop(minutes=3.0)
 async def on_update():
     global compteur
     compteur += 1
@@ -287,3 +345,4 @@ async def on_update():
 
 
 client.run(TOKEN)
+
