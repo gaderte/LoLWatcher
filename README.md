@@ -19,6 +19,9 @@ Comment utiliser le bot :
   - Un membre peut utiliser la commande "addjoueur" pour s'ajouter dans la liste (1 compte LoL par membre)
   - Un membre peut utiliser la commande "leavelolwatcher" pour se retirer de la liste
   - La commande "listjoueurs" permet d'afficher tous les joueurs inscrits sur votre serveur
+  - La commande "infojoueur" permet d'afficher l'élo d'un joueur à partir de son SummonerName, s'il est inscrit dans votre liste
+  - La commande "infojoueurdiscord" permet d'afficher l'élo d'un joueur à partir de son Discord, s'il est inscrit dans votre liste
+  - La commande "alertadmin" permet de me contacter pour un problème ou autre chose. Pas de spam merci sinon ça va barder.
 
 Si un joueur est kick ou ban du serveur, le bot clear automatiquement son compte
 Si le bot est kick ou ban du serveur, il clear automatiquement tous les comptes associés
@@ -28,6 +31,7 @@ Si le bot est kick ou ban du serveur, il clear automatiquement tous les comptes 
 /!\ Avant d'ajouter un joueur, soyez sûr que le pseudo est bien orthographié et que le joueur a fini ses games de placements /!\
 
 Contactez moi sur Discord au besoin : DRX Atlas#6180
+
 
 
 English :
@@ -40,6 +44,9 @@ How to use :
   - A discord member can use the command "addjoueur" to add himself (1 account per member)
   - A discord member can use the command "leavelolwatcher" to remove himself
   - "listjoueurs" is a command to display all players register on your server
+  - "infojoueur" to display player's rank using his SummonerName, if registered in your guild
+  - "infojoueurdiscord" to display player's rank using his Discord, if registered in your guild
+  - "alertadmin" to contact me if needed (problem or something else). Don't spam it because it's gonna piss me off
 
 if you kick or ban the bot => clear all players
 if a player leave your guild => clear from players list
