@@ -21,6 +21,12 @@ class Database(object):
         self.cursor.execute(request, params)
         self.db.commit()
 
+    def GetServInfoByID(self, guildid):
+        request = "SELECT * FROM serveurs WHERE guildID = %s"
+        params = [guildid]
+        self.cursor.execute(request, params)
+        return self.cursor.fetchone()
+
     def addServeur(self, guildid, guildname, cim, rtp):
         request = "INSERT INTO serveurs (guildID, guildName, channelIdMessage, roleToPing) "\
                   "VALUES (%s, %s, %s, %s)"
@@ -55,10 +61,10 @@ class Database(object):
         self.cursor.execute(r3, p2)
         self.db.commit()
 
-    def addJoueur(self, encryptedid, summonername, tier, rank, lps, eb, prog, guildid, member_id):
-        request = "INSERT INTO joueurs (EncryptedID, SummonerName, Tier, Rank, leaguePoints, enBO, Progress, " \
-                  "guildID, memberID) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)"
-        params = [encryptedid, summonername, tier, rank, lps, eb, prog, guildid, member_id]
+    def addJoueur(self, encryptedid, summonername, tier, rank, lps, guildid, member_id):
+        request = "INSERT INTO joueurs (EncryptedID, SummonerName, Tier, Rank, leaguePoints, " \
+                  "guildID, memberID) VALUES (%s, %s, %s, %s, %s, %s, %s)"
+        params = [encryptedid, summonername, tier, rank, lps, guildid, member_id]
         try:
             self.cursor.execute(request, params)
             self.db.commit()
@@ -78,10 +84,10 @@ class Database(object):
         self.cursor.execute(request, params)
         self.db.commit()
 
-    def updateJoueur(self, playerid, summonername, tier, rank, lps, eb, prog):
-        request = "UPDATE joueurs SET SummonerName=%s, Tier=%s, Rank=%s, leaguePoints=%s, enBO=%s, Progress=%s"\
+    def updateJoueur(self, playerid, summonername, tier, rank, lps):
+        request = "UPDATE joueurs SET SummonerName=%s, Tier=%s, Rank=%s, leaguePoints=%s"\
                   " WHERE EncryptedID=%s"
-        params = [summonername, tier, rank, lps, eb, prog, playerid]
+        params = [summonername, tier, rank, lps, playerid]
         self.cursor.execute(request, params)
         self.db.commit()
 
