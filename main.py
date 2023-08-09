@@ -23,10 +23,11 @@ tiers = {
     "SILVER": 3,
     "GOLD": 4,
     "PLATINUM": 5,
-    "DIAMOND": 6,
-    "MASTER": 7,
-    "GRANDMASTER": 8,
-    "CHALLENGER": 9
+    "EMERALD": 6,
+    "DIAMOND": 7,
+    "MASTER": 8,
+    "GRANDMASTER": 9,
+    "CHALLENGER": 10
 }
 ranks = {
     "IV": 1,
@@ -37,27 +38,15 @@ ranks = {
 
 
 def displayInfo(player):
-    temp = "Le joueur " + player.get("summonername") + " est classé " + str(player.get("tier")) + " " + \
+    return "Le joueur " + player.get("summonername") + " est classé " + str(player.get("tier")) + " " + \
            str(player.get("rank")) + " avec " + str(player.get("lps")) + " LPs."
-    if player.get("enBo") == 1:
-        x = player.get("progress").replace('W', ":white_check_mark: ")\
-            .replace('L', ":no_entry_sign: ").replace('N', ":clock3: ")
-        temp += "\nLe joueur est actuellement en BO : " + x
-    return temp
 
 
 def createPlayer(acc, rank, guild, member_id):
     for typegames in rank:
         if typegames.get('queueType') == "RANKED_SOLO_5x5":
-            if typegames.get('miniSeries') is not None:
-                prog = typegames.get('miniSeries')
-                progress = prog.get('progress')
-                enBo = True
-            else:
-                progress = ""
-                enBo = False
             rc = db.addJoueur(acc.get('id'), acc.get('name'), typegames.get('tier'), typegames.get('rank'),
-                              typegames.get('leaguePoints'), enBo, progress, guild.id, member_id)
+                              typegames.get('leaguePoints'), guild.id, member_id)
             db.AddClassement(acc.get('id'))
             return rc
 
@@ -74,6 +63,7 @@ def addPlayer(summonername, guild, member_id):
     urlRanks = 'https://euw1.api.riotgames.com/lol/league/v4/entries/by-summoner/' + account.get('id') + \
                '?api_key=' + riot_api_key
     r = requests.get(urlRanks)
+    print("Impossible de récupérer les données de chez Riot Games")
     ranking = r.json()
     if r.status_code != 200:
         print("Erreur API Riot.")
@@ -99,35 +89,17 @@ def check_rang(player, guild):
                 "tier": player[2],
                 "rank": player[3],
                 "lps": player[4],
-                "enBo": player[5],
-                "progress": player[6]
             }
             newelo = {
                 "summonername": typequeue.get('summonerName'),
                 "tier": typequeue.get('tier'),
                 "rank": typequeue.get('rank'),
-                "lps": typequeue.get('leaguePoints'),
-                "enBo": 0,
-                "progress": None
+                "lps": typequeue.get('leaguePoints')
             }
+            # guild[3] ==> rôle à ping
             if guild[3] != 0:
                 ret += "<@&" + str(guild[3]) + "> "
-            if typequeue.get('miniSeries') is not None:
-                eloactuel["enBo"] = True
-                newelo["enBo"] = 1
-                miniS = typequeue.get('miniSeries')
-                progress = miniS.get('progress')
-                newelo["progress"] = progress
-                if progress != eloactuel["progress"]:
-                    db.updateJoueur(player[0], typequeue.get('summonerName'), typequeue.get('tier'),
-                                    typequeue.get('rank'),
-                                    typequeue.get('leaguePoints'), eloactuel.get("enBo"), progress)
-                    tab_progress = list(filter('N'.__ne__, progress))
-                    if len(tab_progress) != 0 and tab_progress[len(tab_progress) - 1] == 'W':
-                        db.UpdateWinClassement(player[0])
-                    return [ret, newelo]
-            else:
-                eloactuel["enBo"] = False
+
             if typequeue.get('tier') == eloactuel.get("tier") and typequeue.get('rank') == eloactuel.get("rank") and \
                     typequeue.get('leaguePoints') == eloactuel.get("lps"):
                 return ["RAS", newelo]
@@ -136,14 +108,14 @@ def check_rang(player, guild):
                 ret += str(typequeue.get('summonerName')) + " a derank de " + eloactuel.get('tier') + " à " \
                        + typequeue.get('tier')
                 db.updateJoueur(player[0], typequeue.get('summonerName'), typequeue.get('tier'), typequeue.get('rank'),
-                                typequeue.get('leaguePoints'), eloactuel.get("enBo"), eloactuel.get("progress"))
+                                typequeue.get('leaguePoints'))
                 return [ret, newelo]
             if typequeue.get('tier') != eloactuel.get("tier") \
                     and tiers.get(typequeue.get('tier')) > tiers.get(eloactuel.get("tier")):
                 ret += str(typequeue.get('summonerName')) + " a rank up de " + eloactuel.get('tier') + " à " \
                        + typequeue.get('tier')
                 db.updateJoueur(player[0], typequeue.get('summonerName'), typequeue.get('tier'), typequeue.get('rank'),
-                                typequeue.get('leaguePoints'), eloactuel.get("enBo"), eloactuel.get("progress"))
+                                typequeue.get('leaguePoints'))
                 db.UpdateWinClassement(player[0])
                 return [ret, newelo]
 
@@ -153,7 +125,7 @@ def check_rang(player, guild):
                        eloactuel.get("rank") \
                        + " à " + typequeue.get('tier') + ' ' + typequeue.get('rank')
                 db.updateJoueur(player[0], typequeue.get('summonerName'), typequeue.get('tier'), typequeue.get('rank'),
-                                typequeue.get('leaguePoints'), eloactuel.get("enBo"), eloactuel.get("progress"))
+                                typequeue.get('leaguePoints'))
                 return [ret, newelo]
             if typequeue.get('rank') != eloactuel.get("rank") \
                     and ranks.get(typequeue.get('rank')) > ranks.get(eloactuel.get("rank")):
@@ -161,7 +133,7 @@ def check_rang(player, guild):
                        eloactuel.get("rank") \
                        + " à " + typequeue.get('tier') + ' ' + typequeue.get('rank')
                 db.updateJoueur(player[0], typequeue.get('summonerName'), typequeue.get('tier'), typequeue.get('rank'),
-                                typequeue.get('leaguePoints'), eloactuel.get("enBo"), eloactuel.get("progress"))
+                                typequeue.get('leaguePoints'))
                 db.UpdateWinClassement(player[0])
                 return [ret, newelo]
 
@@ -170,14 +142,14 @@ def check_rang(player, guild):
                 ret += str(typequeue.get('summonerName')) + " a perdu -" + \
                        str(eloactuel.get("lps") - typequeue.get('leaguePoints')) + " LPs"
                 db.updateJoueur(player[0], typequeue.get('summonerName'), typequeue.get('tier'), typequeue.get('rank'),
-                                typequeue.get('leaguePoints'), eloactuel.get("enBo"), eloactuel.get("progress"))
+                                typequeue.get('leaguePoints'))
                 return [ret, newelo]
             if typequeue.get('leaguePoints') != eloactuel.get("lps") and typequeue.get('leaguePoints') > \
                     eloactuel.get("lps"):
                 ret += str(typequeue.get('summonerName')) + " a gagné +" + \
                        str(typequeue.get('leaguePoints') - eloactuel.get("lps")) + " LPs"
                 db.updateJoueur(player[0], typequeue.get('summonerName'), typequeue.get('tier'), typequeue.get('rank'),
-                                typequeue.get('leaguePoints'), eloactuel.get("enBo"), eloactuel.get("progress"))
+                                typequeue.get('leaguePoints'))
                 db.UpdateWinClassement(player[0])
                 return [ret, newelo]
 
@@ -219,12 +191,13 @@ async def on_guild_remove(guild):
 
 @client.event
 async def on_member_remove(member):
-    print("MemberRemove : un joueur a quitté un serveur qui a entraîné son retrait de la BDD")
     rowCount, res = db.GetJoueurFromMemberId(member.id)
     if rowCount == 1:
+        print("MemberRemove : un joueur a quitté un serveur qui a entraîné son retrait de la BDD")
         db.RemoveJoueur(member.guild.id, member.id)
         db.DeleteClassement(res[0][0])
     elif rowCount > 1:
+        print("MemberRemove : un joueur a quitté un serveur qui a entraîné son retrait de la BDD")
         db.RemoveJoueur(member.guild.id, member.id)
     return
 
@@ -282,7 +255,7 @@ async def removeJoueur(ints):
         db.DeleteClassement(res[0][0])
     exist = False
     for joueur in res:
-        if joueur[7] == ints.guild_id:
+        if joueur[5] == ints.guild_id:
             exist = True
     if exist:
         db.RemoveJoueur(ints.guild_id, ints.user.id)
@@ -361,6 +334,27 @@ async def alertGuilds(ints, message: str):
     await ints.followup.send("L'alerte a bien été envoyée")
 
 
+@client.tree.command(name="alertspeguild", description="Alerte une guilde spécifique en passant par son owner")
+async def alertSpeGuild(ints, id_guild: str, message: str):
+    if ints.user.id != admin_atlas_id:
+        await ints.response.send_message("Seul l'administrateur peut utiliser cette commande")
+        return
+    await ints.response.defer()
+    g = client.get_guild(int(id_guild))
+    infos = db.GetServInfoByID(int(id_guild))
+    try:
+        chan = g.get_channel(int(infos[2]))
+        await chan.send("Message de l'admin : \n>>> " + message)
+        await ints.followup.send("L'alerte a bien été envoyée dans le salon")
+    except discord.errors.Forbidden:
+        print("Error : Le bot n'a pas le droit d'envoyer un DM dans le salon. Tentative d'envoi au owner...")
+        try:
+            await g.owner.send("Message de l'admin : \n>>> " + message)
+            await ints.followup.send("L'alerte a bien été envoyée au owner")
+        except discord.errors.Forbidden:
+            await ints.followup.send("Le bot n'a pas le droit d'envoyer un DM ni au salon ni au owner")
+
+
 @client.tree.command(name="alertadmin", description="Alerte l'administrateur d'un(e) potentiel(le) problème/demande")
 async def alert_admin(ints, message: str):
     await ints.response.defer()
@@ -376,21 +370,25 @@ async def on_update():
     global compteur
     compteur += 1
     print("\nVérification n°" + str(compteur))
-    # ICI LA => Vérification est pas encore faite
     for i in db.UpdatePlayerRecover():
-        channel = client.get_channel(i[11])
-        guild_infos = [i[9], i[10], i[11], i[12]]
-        retour = check_rang(i, guild_infos)
-        if retour is None:
-            print("Erreur RIOT API.")
-        elif retour[0] != "RAS":
-            retour[0] += "\n" + displayInfo(retour[1])
-            try:
-                await channel.send(str(retour[0]))
-            except discord.errors.Forbidden:
-                print("Error guild '" + guild_infos[1] + "' : Le bot n'a pas le droit d'écrire"
-                                                         " dans le channel initialisé.")
-
+        channel = client.get_channel(i[9])
+        if channel is not None:
+            guild_infos = [i[7], i[8], i[9], i[10]]
+            retour = check_rang(i, guild_infos)
+            if retour is None:
+                print("Erreur RIOT API.")
+            elif retour[0] != "RAS":
+                retour[0] += "\n" + displayInfo(retour[1])
+                try:
+                    await channel.send(str(retour[0]))
+                except discord.errors.Forbidden as e:
+                    print("Error guild '" + guild_infos[1] + "' : Le bot n'a pas le droit d'écrire"
+                                                             " dans le channel initialisé.")
+                    print(e)
+                    await client.get_guild(int(i[7])).owner.send("Le bot n'a pas le droit d'écrire dans le channel "
+                                                                 "initialisé. Veuillez vérifier les permissions "
+                                                                 "accordées au bot.")
+    print("Fin de la Vérification")
 
 @tasks.loop(time=datetime.time(21, 0, 0, 0, ZoneInfo("Europe/Paris")))
 async def classement():
