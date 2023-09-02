@@ -30,7 +30,7 @@ Si le bot est kick ou ban du serveur, il clear automatiquement tous les comptes 
 
 /!\ Avant d'ajouter un joueur, soyez sûr que le pseudo est bien orthographié et que le joueur a fini ses games de placements /!\
 
-Contactez moi sur Discord au besoin : DRX Atlas#6180
+Contactez moi sur Discord au besoin : atlasdxs
 
 
 
