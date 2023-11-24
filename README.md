@@ -16,11 +16,9 @@ Comment utiliser le bot :
   - Lancer la commande "initialize" pour setup le bot. Il y a deux paramètres dont 1 facultatif :
     - "channelmessage" : le channel où seront envoyés les messages concernant l'elo
     - "roleaping" (facultatif) : le rôle qui sera ping à chaque nouvelle notification. Laissez vide si pas de role
-  - Un membre peut utiliser la commande "addjoueur" pour s'ajouter dans la liste (1 compte LoL par membre)
-  - Un membre peut utiliser la commande "leavelolwatcher" pour se retirer de la liste
+  - Un membre peut utiliser la commande "ajoutjoueur" pour s'ajouter dans la liste (1 compte LoL par membre)
+  - Un membre peut utiliser la commande "retraitjoueur" pour se retirer de la liste
   - La commande "listjoueurs" permet d'afficher tous les joueurs inscrits sur votre serveur
-  - La commande "infojoueur" permet d'afficher l'élo d'un joueur à partir de son SummonerName, s'il est inscrit dans votre liste
-  - La commande "infojoueurdiscord" permet d'afficher l'élo d'un joueur à partir de son Discord, s'il est inscrit dans votre liste
   - La commande "alertadmin" permet de me contacter pour un problème ou autre chose. Pas de spam merci sinon ça va barder.
 
 Si un joueur est kick ou ban du serveur, le bot clear automatiquement son compte
@@ -41,8 +39,8 @@ How to use :
   - Launch "initialize" command to set-up the bot. It only needs 1 parameter :
     - "channelmessage" : enter the channel where the bot will display elo change messages
     - "roleaping" (optional) : enter a role to ping each time a message is displayed. Leave blank if not needed
-  - A discord member can use the command "addjoueur" to add himself (1 account per member)
-  - A discord member can use the command "leavelolwatcher" to remove himself
+  - A discord member can use the command "ajoutjoueur" to add himself (1 account per member)
+  - A discord member can use the command "retraitjoueur" to remove himself
   - "listjoueurs" is a command to display all players register on your server
   - "infojoueur" to display player's rank using his SummonerName, if registered in your guild
   - "infojoueurdiscord" to display player's rank using his Discord, if registered in your guild
