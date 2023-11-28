@@ -1,6 +1,3 @@
-import datetime
-from zoneinfo import ZoneInfo
-
 import discord
 import requests
 from discord.ext import tasks, commands
@@ -8,11 +5,16 @@ from discord.ext import tasks, commands
 from Database import Database
 
 compteur = 0
-db = Database()
-admin_atlas_id = 114372984604590080
-stratacademy_id = 799713691447853057
+
 riot_api_key = "X"
-TOKEN = "X"
+atlas_id = 114372984604590080
+db = Database()
+
+url_icon_champion = "https://raw.communitydragon.org/latest/plugins/rcp-be-lol-game-data/global/default/v1/champion-icons/{0}.png"
+url_summoner = "https://euw1.api.riotgames.com/lol/summoner/v4/summoners/by-name/{0}?api_key={1}"  # Récupération EncryptedID + PUUID
+url_leaguev4 = "https://euw1.api.riotgames.com/lol/league/v4/entries/by-summoner/{0}?api_key={1}"  # Récupération Elo
+url_historique = "https://europe.api.riotgames.com/lol/match/v5/matches/by-puuid/{0}/ids?queue=420&start=0&count=1&api_key={1}"  # Récupération historique game
+url_resume_match = "https://europe.api.riotgames.com/lol/match/v5/matches/{0}?api_key={1}"  # Récupération données du match
 
 intents = discord.Intents.all()
 client = commands.Bot(command_prefix="/", intents=intents)
@@ -37,129 +39,120 @@ ranks = {
 }
 
 
-def displayInfo(player):
-    return "Le joueur " + player.get("summonername") + " est classé " + str(player.get("tier")) + " " + \
-           str(player.get("rank")) + " avec " + str(player.get("lps")) + " LPs."
-
-
-def createPlayer(acc, rank, guild, member_id):
-    for typegames in rank:
-        if typegames.get('queueType') == "RANKED_SOLO_5x5":
-            rc = db.addJoueur(acc.get('id'), acc.get('name'), typegames.get('tier'), typegames.get('rank'),
-                              typegames.get('leaguePoints'), guild.id, member_id)
-            db.AddClassement(acc.get('id'))
-            return rc
-
-
-def addPlayer(summonername, guild, member_id):
-    urlSummoners = 'https://euw1.api.riotgames.com/lol/summoner/v4/summoners/by-name/' + summonername + \
-                   '?api_key=' + riot_api_key
-    r = requests.get(urlSummoners)
+def add_player(summoner_name, guild_id, member_id):
+    r = requests.get(url_summoner.format(summoner_name, riot_api_key))
     if r.status_code != 200:
-        print("Code erreur : " + str(r.status_code))
-        print("Erreur API Riot.")
+        print("Riot Api ERROR - SummonerAPI - Code Erreur : {0}".format(r.status_code))
         return None
     account = r.json()
-    urlRanks = 'https://euw1.api.riotgames.com/lol/league/v4/entries/by-summoner/' + account.get('id') + \
-               '?api_key=' + riot_api_key
-    r = requests.get(urlRanks)
-    print("Impossible de récupérer les données de chez Riot Games")
-    ranking = r.json()
-    if r.status_code != 200:
-        print("Erreur API Riot.")
+    r2 = requests.get(url_leaguev4.format(account.get('id'), riot_api_key))
+    if r2.status_code != 200:
+        print("Riot Api ERROR - LeagueV4API - Code Erreur : {0}".format(r.status_code))
         return None
-    nbr = createPlayer(account, ranking, guild, member_id)
-    return nbr
+    # Récupération rank
+    rank = r2.json()
+    for typegame in rank:
+        if typegame.get('queueType') == "RANKED_SOLO_5x5":
+            r3 = requests.get(url_historique.format(account.get("puuid"), riot_api_key))
+            last_game_played = r3.json()[0]
+            rc = db.addJoueur(account.get('id'), account.get('puuid'), account.get('name'), typegame.get('tier'),
+                              typegame.get('rank'), typegame.get('leaguePoints'), last_game_played, guild_id, member_id)
+            return rc
+    return None
 
 
-def check_rang(player, guild):
-    urlRanks = 'https://euw1.api.riotgames.com/lol/league/v4/entries/by-summoner/' + player[0] + \
-               '?api_key=' + riot_api_key
-    r = requests.get(urlRanks)
+def check_last_game(dbinfos):
+    r = requests.get(url_historique.format(dbinfos[1], riot_api_key))
+    if r.json()[0] != dbinfos[6]:
+        return r.json()[0]
+    return 0
+
+
+def check_rang(pinfos, game_id):
+    r = requests.get(url_leaguev4.format(pinfos[0], riot_api_key))
     ranking = r.json()
     if r.status_code != 200:
-        print("Code erreur : " + str(r.status_code))
-        print("Erreur API Riot.")
-        return None
+        print("Riot Api ERROR - LeagueV4API - Code Erreur : {0}".format(r.status_code))
+        return None, None, None
     for typequeue in ranking:
         if typequeue.get('queueType') == 'RANKED_SOLO_5x5':
-            ret = ""
-            eloactuel = {
-                "summonername": player[1],
-                "tier": player[2],
-                "rank": player[3],
-                "lps": player[4],
-            }
-            newelo = {
-                "summonername": typequeue.get('summonerName'),
-                "tier": typequeue.get('tier'),
-                "rank": typequeue.get('rank'),
-                "lps": typequeue.get('leaguePoints')
-            }
-            # guild[3] ==> rôle à ping
-            if guild[3] != 0:
-                ret += "<@&" + str(guild[3]) + "> "
+            retourFct = ""
+            if typequeue.get('tier') == pinfos[3] and typequeue.get('rank') == pinfos[4] and \
+                    typequeue.get('leaguePoints') == pinfos[5]:
+                db.updateMatchID(pinfos[7], pinfos[8], game_id)
+                return None, typequeue.get("wins"), typequeue.get("losses")
+            if typequeue.get('tier') != pinfos[3] \
+                    and tiers.get(typequeue.get('tier')) < tiers.get(pinfos[3]):
+                retourFct += "de perdre une SoloQ. Il a derank {0} ({1} {2} {3} LP)".format(typequeue.get('tier'), typequeue.get('tier'), typequeue.get('rank'), typequeue.get('leaguePoints'))
+                db.updateJoueur(pinfos[0], typequeue.get('summonerName'), typequeue.get('tier'), typequeue.get('rank'),
+                                typequeue.get('leaguePoints'), game_id, pinfos[7])
+                return retourFct, typequeue.get("wins"), typequeue.get("losses")
+            if typequeue.get('tier') != pinfos[3] \
+                    and tiers.get(typequeue.get('tier')) > tiers.get(pinfos[3]):
+                retourFct += "de gagner une SoloQ. Il a rank up {0} ({1} {2} {3} LP)".format(typequeue.get('tier'), typequeue.get('tier'), typequeue.get('rank'), typequeue.get('leaguePoints'))
+                db.updateJoueur(pinfos[0], typequeue.get('summonerName'), typequeue.get('tier'), typequeue.get('rank'),
+                                typequeue.get('leaguePoints'), game_id, pinfos[7])
+                return retourFct, typequeue.get("wins"), typequeue.get("losses")
+            if typequeue.get('rank') != pinfos[4] \
+                    and ranks.get(typequeue.get('rank')) < ranks.get(pinfos[4]):
+                retourFct += "de perdre une SoloQ. Il a derank {0} {1} ({2} {3} {4} LP)".format(typequeue.get('tier'), typequeue.get('rank'), typequeue.get('tier'), typequeue.get('rank'), typequeue.get('leaguePoints'))
+                db.updateJoueur(pinfos[0], typequeue.get('summonerName'), typequeue.get('tier'), typequeue.get('rank'),
+                                typequeue.get('leaguePoints'), game_id, pinfos[7])
+                return retourFct, typequeue.get("wins"), typequeue.get("losses")
+            if typequeue.get('rank') != pinfos[4] \
+                    and ranks.get(typequeue.get('rank')) > ranks.get(pinfos[4]):
+                retourFct += "de gagner une SoloQ. Il a rank up {0} {1} ({2} {3} {4} LP)".format(typequeue.get('tier'), typequeue.get('rank'), typequeue.get('tier'), typequeue.get('rank'), typequeue.get('leaguePoints'))
+                db.updateJoueur(pinfos[0], typequeue.get('summonerName'), typequeue.get('tier'), typequeue.get('rank'),
+                                typequeue.get('leaguePoints'), game_id, pinfos[7])
+                return retourFct, typequeue.get("wins"), typequeue.get("losses")
+            if typequeue.get('leaguePoints') != pinfos[5] \
+                    and typequeue.get('leaguePoints') < pinfos[5]:
+                retourFct += "de perdre une SoloQ. Il a perdu {0} LPs ({1} {2} {3} LP)".format(int(typequeue.get('leaguePoints')) - pinfos[5], typequeue.get('tier'), typequeue.get('rank'), typequeue.get('leaguePoints'))
+                db.updateJoueur(pinfos[0], typequeue.get('summonerName'), typequeue.get('tier'), typequeue.get('rank'),
+                                typequeue.get('leaguePoints'), game_id, pinfos[7])
+                return retourFct, typequeue.get("wins"), typequeue.get("losses")
+            if typequeue.get('leaguePoints') != pinfos[5] \
+                    and typequeue.get('leaguePoints') > pinfos[5]:
+                retourFct += "de gagner une SoloQ. Il a gagné {0} LPs ({1} {2} {3} LP)".format(int(typequeue.get('leaguePoints')) - pinfos[5], typequeue.get('tier'), typequeue.get('rank'), typequeue.get('leaguePoints'))
+                db.updateJoueur(pinfos[0], typequeue.get('summonerName'), typequeue.get('tier'), typequeue.get('rank'),
+                                typequeue.get('leaguePoints'), game_id, pinfos[7])
+                return retourFct, typequeue.get("wins"), typequeue.get("losses")
 
-            if typequeue.get('tier') == eloactuel.get("tier") and typequeue.get('rank') == eloactuel.get("rank") and \
-                    typequeue.get('leaguePoints') == eloactuel.get("lps"):
-                return ["RAS", newelo]
-            if typequeue.get('tier') != eloactuel.get("tier") \
-                    and tiers.get(typequeue.get('tier')) < tiers.get(eloactuel.get("tier")):
-                ret += str(typequeue.get('summonerName')) + " a derank de " + eloactuel.get('tier') + " à " \
-                       + typequeue.get('tier')
-                db.updateJoueur(player[0], typequeue.get('summonerName'), typequeue.get('tier'), typequeue.get('rank'),
-                                typequeue.get('leaguePoints'))
-                return [ret, newelo]
-            if typequeue.get('tier') != eloactuel.get("tier") \
-                    and tiers.get(typequeue.get('tier')) > tiers.get(eloactuel.get("tier")):
-                ret += str(typequeue.get('summonerName')) + " a rank up de " + eloactuel.get('tier') + " à " \
-                       + typequeue.get('tier')
-                db.updateJoueur(player[0], typequeue.get('summonerName'), typequeue.get('tier'), typequeue.get('rank'),
-                                typequeue.get('leaguePoints'))
-                db.UpdateWinClassement(player[0])
-                return [ret, newelo]
 
-            if typequeue.get('rank') != eloactuel.get("rank") \
-                    and ranks.get(typequeue.get('rank')) < ranks.get(eloactuel.get("rank")):
-                ret += str(typequeue.get('summonerName')) + " est descendu de " + eloactuel.get("tier") + ' ' + \
-                       eloactuel.get("rank") \
-                       + " à " + typequeue.get('tier') + ' ' + typequeue.get('rank')
-                db.updateJoueur(player[0], typequeue.get('summonerName'), typequeue.get('tier'), typequeue.get('rank'),
-                                typequeue.get('leaguePoints'))
-                return [ret, newelo]
-            if typequeue.get('rank') != eloactuel.get("rank") \
-                    and ranks.get(typequeue.get('rank')) > ranks.get(eloactuel.get("rank")):
-                ret += str(typequeue.get('summonerName')) + " est monté de " + eloactuel.get("tier") + ' ' + \
-                       eloactuel.get("rank") \
-                       + " à " + typequeue.get('tier') + ' ' + typequeue.get('rank')
-                db.updateJoueur(player[0], typequeue.get('summonerName'), typequeue.get('tier'), typequeue.get('rank'),
-                                typequeue.get('leaguePoints'))
-                db.UpdateWinClassement(player[0])
-                return [ret, newelo]
+def create_embed(pinfos, descriptif, i, wins, losses):
+    if pinfos[7].nick:
+        n = pinfos[7].nick
+    else:
+        n = pinfos[7].name
+    if pinfos[6]:
+        if descriptif is None:
+            embed = discord.Embed(title="Victoire", description="{0} est actuellement {1} {2} {3} LP".format(n, i[3], i[4], i[5]),
+                                  color=0x00ff00)
+        else:
+            embed = discord.Embed(title="Victoire", description="{0} vient {1}".format(n, descriptif),
+                                  color=0x00ff00)
+    else:
+        if descriptif is None:
+            embed = discord.Embed(title="Défaite", description="{0} est actuellement {1} {2} {3} LP".format(n, i[3], i[4], i[5]),
+                                  color=0xff0000)
+        else:
+            embed = discord.Embed(title="Défaite", description="{0} vient {1}".format(n, descriptif),
+                                  color=0xff0000)
 
-            if typequeue.get('leaguePoints') != eloactuel.get("lps") and typequeue.get('leaguePoints') < \
-                    eloactuel.get("lps"):
-                ret += str(typequeue.get('summonerName')) + " a perdu -" + \
-                       str(eloactuel.get("lps") - typequeue.get('leaguePoints')) + " LPs"
-                db.updateJoueur(player[0], typequeue.get('summonerName'), typequeue.get('tier'), typequeue.get('rank'),
-                                typequeue.get('leaguePoints'))
-                return [ret, newelo]
-            if typequeue.get('leaguePoints') != eloactuel.get("lps") and typequeue.get('leaguePoints') > \
-                    eloactuel.get("lps"):
-                ret += str(typequeue.get('summonerName')) + " a gagné +" + \
-                       str(typequeue.get('leaguePoints') - eloactuel.get("lps")) + " LPs"
-                db.updateJoueur(player[0], typequeue.get('summonerName'), typequeue.get('tier'), typequeue.get('rank'),
-                                typequeue.get('leaguePoints'))
-                db.UpdateWinClassement(player[0])
-                return [ret, newelo]
+    embed.set_author(name="LoLWatcher - Résumé de la partie")
+    embed.set_thumbnail(url=url_icon_champion.format(pinfos[1]))
+    embed.add_field(name="Score", value="{0}/{1}/{2}".format(pinfos[3], pinfos[4], pinfos[5]), inline=True)
+    embed.add_field(name="Champion", value=pinfos[0], inline=True)
+    embed.add_field(name="Role", value=pinfos[2], inline=True)
+    if wins is not None and losses is not None:
+        embed.add_field(name="WinRate", value="{0}%".format(round(int(wins) * 100/(int(wins) + int(losses)), 2)), inline=True)
+
+    return embed
 
 
 @client.event
 async def on_ready():
-    print('Connecté en tant que')
-    print(client.user.name)
-    print(client.user.id)
-    print('-------')
+    print("Connecté en tant que : {0} ({1})".format(client.user.name, client.user.id))
     print(f'{client.user} is connected to the following guilds:\n')
     for guild in client.guilds:
         print(
@@ -168,22 +161,19 @@ async def on_ready():
     print("Synchro du tree...")
     await client.tree.sync()
     await client.wait_until_ready()
-    print("Chargement de l'activité...")
-    await client.change_presence(activity=discord.Game(name="Je vous vois tous"))
     on_update.start()
-    classement.start()
 
 
 @client.event
 async def on_guild_join(guild):
-    print("GuildAdd : le bot a été ajouté sur un serveur")
+    print("Le bot a été ajouté sur un serveur")
     db.addServeur(guild.id, guild.name, 0, 0)
     return
 
 
 @client.event
 async def on_guild_remove(guild):
-    print("GuildRemove : un serveur a supprimé le bot")
+    print("Le bot a quitté une guilde")
     db.removeServeur(guild.id)
     db.removeAllJoueurs(guild.id)
     return
@@ -191,32 +181,20 @@ async def on_guild_remove(guild):
 
 @client.event
 async def on_member_remove(member):
-    rowCount, res = db.GetJoueurFromMemberId(member.id)
-    if rowCount == 1:
+    rowcount = db.deleteJoueurByMemberID(member.id, member.guild.id)
+    if rowcount == 1:
         print("MemberRemove : un joueur a quitté un serveur qui a entraîné son retrait de la BDD")
-        db.RemoveJoueur(member.guild.id, member.id)
-        db.DeleteClassement(res[0][0])
-    elif rowCount > 1:
-        print("MemberRemove : un joueur a quitté un serveur qui a entraîné son retrait de la BDD")
-        db.RemoveJoueur(member.guild.id, member.id)
     return
 
 
-@client.event
-async def on_message(message):
-    if message.author.id == client.user.id:
-        return
-    await client.process_commands(message)
-
-
-@client.tree.command(name="initialize", description="Initialise un nouveau serveur")
-async def initialize(ints, channelmessage: discord.TextChannel,
-                     roleaping: discord.Role = None):
-    print("Initialisation : une initialisation a été demandée")
+@client.tree.command(name="initialize", description="Initialise les informations du serveur")
+async def initialize(ints, channelmessage: discord.TextChannel, roleaping: discord.Role = None):
+    print("Une demande d'initialisation a été envoyée")
+    await ints.response.defer()
     try:
-        msg = "Message test. Si vous voyez ce message, cela signifie que le bot a l'autorisation d'écrire dans le " \
-              "channel. Vous pouvez le supprimer dès la fin de l'initialisation."
-        await channelmessage.send(msg)
+        msg = "Message test. Si vous voyez ce message, cela signifie que le bot a l'autorisation d'écrire dans le channel."
+        msg_retour = await channelmessage.send(msg)
+        await msg_retour.delete()
     except discord.errors.Forbidden:
         msg = "Le bot n'a pas l'autorisation d'écrire dans le channel : " + channelmessage.name + \
               ". Veuillez changer de channel ou accorder les autorisations avant de recommencer."
@@ -224,119 +202,15 @@ async def initialize(ints, channelmessage: discord.TextChannel,
         return
     else:
         if not roleaping:
-            roleaping = 0
-            db.InitializeServer(ints.guild_id, channelmessage.id, roleaping)
+            db.initializeServer(ints.guild_id, channelmessage.id, 0)
         else:
-            db.InitializeServer(ints.guild_id, channelmessage.id, roleaping.id)
-        await ints.response.send_message("Le serveur a bien été initialisé")
-
-
-@client.tree.command(name="addjoueur", description="S'ajouter dans la liste des joueurs")
-async def addJoueur(ints, nomjoueur: str):
-    print("Addjoueur : une demande d'ajout a été envoyée")
-    ret = addPlayer(nomjoueur, ints.guild, ints.user.id)
-    if ret is None:
-        msg = "Erreur lors de l'ajout du joueur. Veuillez vérifier qu'il existe bien, qu'il est niveau 30 et qu'il" \
-              " a fini ses games de placements."
-        await ints.response.send_message(msg)
-    elif ret == 1:
-        await ints.response.send_message("Vous avez bien été ajouté à la liste.")
-    elif ret == 2:
-        await ints.response.send_message("Vous êtes déjà dans la liste du Bot.")
-    else:
-        print("Erreur lors de l'ajout.")
-
-
-@client.tree.command(name="leavelolwatcher", description="Se retirer de la liste des joueurs")
-async def removeJoueur(ints):
-    print("LeaveLoLWatcher : une demande de retrait a été envoyée")
-    rowCount, res = db.GetJoueurFromMemberId(ints.user.id)
-    if rowCount == 1:
-        db.DeleteClassement(res[0][0])
-    exist = False
-    for joueur in res:
-        if joueur[5] == ints.guild_id:
-            exist = True
-    if exist:
-        db.RemoveJoueur(ints.guild_id, ints.user.id)
-        await ints.response.send_message("Vous avez été retiré de la liste")
-    else:
-        await ints.response.send_message("Vous n'êtes pas présent dans la liste")
-
-
-@client.tree.command(name="listejoueurs", description="Liste des joueurs")
-async def listeJoueurs(ints):
-    await ints.response.defer()
-    print("Listejoueurs : une liste a été demandée à la BDD")
-    res = db.GetJoueursOfGuild(ints.guild_id)
-    g = ints.guild
-    retour = "Liste de(s) joueur(s) : \n"
-    if not res:
-        retour = "La liste des joueurs est vide"
-    else:
-        for i in res:
-            try:
-                m = await g.fetch_member(i[8])
-                retour += " - " + i[1] + " (" + m.name + ") \n"
-            except discord.NotFound:
-                retour += " - " + i[1] + " (ERREUR : NOT FOUND) \n"
-        temp = retour.rsplit('\n', 1)
-        retour = ''.join(temp)
-    await ints.followup.send(retour)
-
-
-@client.tree.command(name="infojoueur", description="Donne les infos d'un joueur")
-async def info_joueur(ints, summonername: str):
-    await ints.response.defer()
-    print("Infojoueur : une info de joueur a été demandée à la BDD")
-    p = db.GetPlayerInfo(ints.guild_id, summonername)
-    if p:
-        temp = "Le joueur " + p[1] + " est classé " + str(p[2]) + " " + \
-               str(p[3]) + " avec " + str(p[4]) + " LPs."
-        if p[5] == 1:
-            x = p[6].replace('W', ":white_check_mark: ").replace('L', ":no_entry_sign: ").replace('N', ":clock3: ")
-            temp += "\nLe joueur est actuellement en BO : " + x
-        await ints.followup.send(temp)
-    else:
-        temp = "Erreur lors de la récupération du joueur. Veuillez vérifier qu'il existe bien"
-        await ints.followup.send(temp)
-
-@client.tree.command(name="infojoueurdiscord", description="Donne les infos d'un joueur")
-async def info_joueur_discord(ints, membre: discord.Member):
-    await ints.response.defer()
-    print("Infojoueurdiscord : une info de membre Discord a été demandée à la BDD")
-    p = db.GetPlayerInfoDiscord(ints.guild_id, membre.id)
-    if p:
-        temp = "Le joueur " + p[1] + " est classé " + str(p[2]) + " " + \
-               str(p[3]) + " avec " + str(p[4]) + " LPs."
-        if p[5] == 1:
-            x = p[6].replace('W', ":white_check_mark: ").replace('L', ":no_entry_sign: ").replace('N', ":clock3: ")
-            temp += "\nLe joueur est actuellement en BO : " + x
-        await ints.followup.send(temp)
-    else:
-        temp = "Erreur lors de la récupération du joueur. Veuillez vérifier qu'il existe bien"
-        await ints.followup.send(temp)
-
-
-@client.tree.command(name="alert", description="Alerte tous les utilisateurs du bot")
-async def alertGuilds(ints, message: str):
-    if ints.user.id != admin_atlas_id:
-        await ints.response.send_message("Seul l'administrateur peut utiliser cette commande")
-        return
-    await ints.response.defer()
-    for g in db.recoverAllGuilds():
-        channel = client.get_channel(g[2])
-        try:
-            await channel.send("Message de l'admin : \n>>> " + message)
-        except Exception as e:
-            print(e)
-    print("Alert : une alerte a été envoyée aux serveurs")
-    await ints.followup.send("L'alerte a bien été envoyée")
+            db.initializeServer(ints.guild_id, channelmessage.id, roleaping.id)
+        await ints.followup.send("Le serveur a bien été initialisé.")
 
 
 @client.tree.command(name="alertspeguild", description="Alerte une guilde spécifique en passant par son owner")
 async def alertSpeGuild(ints, id_guild: str, message: str):
-    if ints.user.id != admin_atlas_id:
+    if ints.user.id != atlas_id:
         await ints.response.send_message("Seul l'administrateur peut utiliser cette commande")
         return
     await ints.response.defer()
@@ -358,51 +232,104 @@ async def alertSpeGuild(ints, id_guild: str, message: str):
 @client.tree.command(name="alertadmin", description="Alerte l'administrateur d'un(e) potentiel(le) problème/demande")
 async def alert_admin(ints, message: str):
     await ints.response.defer()
-    atlas = await client.fetch_user(admin_atlas_id)
+    atlas = await client.fetch_user(atlas_id)
     ret = "<@" + str(ints.user.id) + "> vous a envoyé un message : \n\n" + message
     await atlas.send(ret)
     await ints.followup.send("Votre message a bien été envoyé. Vous serez recontacté sous peu."
                              " Merci de ne pas spam la commande")
 
 
-@tasks.loop(minutes=3.0)
+@client.tree.command(name="alert", description="Alerte tous les utilisateurs du bot")
+async def alertGuilds(ints, message: str):
+    if ints.user.id != atlas_id:
+        await ints.response.send_message("Seul l'administrateur peut utiliser cette commande")
+        return
+    await ints.response.defer()
+    for g in db.recoverAllGuilds():
+        channel = client.get_channel(g[2])
+        try:
+            await channel.send("Message de l'admin : \n>>> " + message)
+        except Exception as e:
+            print(e)
+    print("Alert : une alerte a été envoyée aux serveurs")
+    await ints.followup.send("L'alerte a bien été envoyée")
+
+
+@client.tree.command(name="listejoueurs", description="Liste des joueurs")
+async def listeJoueurs(ints):
+    await ints.response.defer()
+    print("Listejoueurs : une liste a été demandée à la BDD")
+    res = db.GetJoueursOfGuild(ints.guild_id)
+    g = ints.guild
+    retour = "Liste de(s) joueur(s) : \n"
+    if not res:
+        retour = "La liste des joueurs est vide"
+    else:
+        for i in res:
+            try:
+                m = await g.fetch_member(i[8])
+                retour += " - " + i[2] + " (" + m.name + ") \n"
+            except discord.NotFound:
+                retour += " - " + i[2] + " (ERREUR : NOT FOUND) \n"
+        temp = retour.rsplit('\n', 1)
+        retour = ''.join(temp)
+    await ints.followup.send(retour)
+
+
+@client.tree.command(name="ajoutjoueur", description="Ajoute un joueur à la base de données")
+async def add_joueur(ints, summoner_name: str):
+    print("Une demande d'ajout a été envoyée")
+    player = add_player(summoner_name, ints.guild_id, ints.user.id)
+    if not player:
+        await ints.response.send_message("Erreur lors de l'ajout du joueur. Veuillez vérifier le summoner name.")
+    elif player == 1:
+        await ints.response.send_message("Vous avez bien été ajouté au bot")
+    else:
+        await ints.response.send_message("Vous êtes déjà dans la liste du bot")
+
+
+@client.tree.command(name="retraitjoueur", description="Sortir de la liste LoLWatcher")
+async def remove_joueur(ints):
+    print("Une demande de retrait a été effectuée")
+    rc = db.deleteJoueurByMemberID(ints.user.id, ints.guild_id)
+    if rc == 1:
+        await ints.response.send_message("Vous avez été retiré du bot LoLWatcher")
+    else:
+        await ints.response.send_message("Vous n'êtes pas présent dans la base de données")
+
+
+@tasks.loop(minutes=2, seconds=30)
 async def on_update():
     global compteur
     compteur += 1
-    print("\nVérification n°" + str(compteur))
-    for i in db.UpdatePlayerRecover():
-        channel = client.get_channel(i[9])
+    print("Vérification n°{0}".format(compteur))
+    for i in db.UpdatePlayerRecover(compteur):
+        channel = client.get_channel(i[11])
         if channel is not None:
-            guild_infos = [i[7], i[8], i[9], i[10]]
-            retour = check_rang(i, guild_infos)
-            if retour is None:
-                print("Erreur RIOT API.")
-            elif retour[0] != "RAS":
-                retour[0] += "\n" + displayInfo(retour[1])
-                try:
-                    await channel.send(str(retour[0]))
-                except discord.errors.Forbidden as e:
-                    print("Error guild '" + guild_infos[1] + "' : Le bot n'a pas le droit d'écrire"
-                                                             " dans le channel initialisé.")
-                    print(e)
-                    await client.get_guild(int(i[7])).owner.send("Le bot n'a pas le droit d'écrire dans le channel "
-                                                                 "initialisé. Veuillez vérifier les permissions "
-                                                                 "accordées au bot.")
-    print("Fin de la Vérification")
-
-@tasks.loop(time=datetime.time(21, 0, 0, 0, ZoneInfo("Europe/Paris")))
-async def classement():
-    td = datetime.datetime.now(ZoneInfo("Europe/Paris"))
-    if td.weekday() != 6:
-        return
-    c = db.GetClassement(stratacademy_id)
-    msg_return = "La semaine est finie ! Voici les meilleurs joueurs de la semaine : \n"
-    msg_return += ":first_place: " + c[0][0] + " (<@" + str(c[0][1]) + ">) avec " + str(c[0][2]) + " victoires !\n"
-    msg_return += ":second_place: " + c[1][0] + " (<@" + str(c[1][1]) + ">) avec " + str(c[1][2]) + " victoires !\n"
-    msg_return += ":third_place: " + c[2][0] + " (<@" + str(c[2][1]) + ">) avec " + str(c[2][2]) + " victoires !\n"
-    msg_return += "\nBravo à tous les participants. La classement est maintenant reset. A la semaine prochaine !"
-    await client.get_channel(c[0][3]).send(msg_return)
-    db.ResetClassement()
+            gameID = check_last_game(i)
+            if gameID != 0:
+                r = requests.get(url_resume_match.format(gameID, riot_api_key))
+                participants = r.json().get('info').get('participants')
+                for player in participants:
+                    if player.get('puuid') == i[1]:
+                        member = await client.get_guild(i[7]).fetch_member(i[8])
+                        p_info = [player.get('championName'), player.get('championId'), player.get('lane'), player.get('kills'),
+                                  player.get('deaths'), player.get('assists'), player.get('win'), member]
+                        retour, wins, losses = check_rang(i, gameID)
+                        try:
+                            if i[12] != 0:
+                                role = client.get_guild(i[7]).get_role(i[12])
+                                await channel.send(content=role.mention, embed=create_embed(p_info, retour, i, wins, losses))
+                            else:
+                                await channel.send(embed=create_embed(p_info, retour, i, wins, losses))
+                        except discord.errors.Forbidden as e:
+                            print("Error guild '" + p_info[10] + "' : Le bot n'a pas le droit d'écrire dans le channel initialisé.")
+                            print(e)
+                            await client.get_guild(int(i[7])).owner.send(
+                                "Le bot n'a pas le droit d'écrire dans le channel "
+                                "initialisé. Veuillez vérifier les permissions accordées au bot."
+                            )
+    print("Fin de la vérification")
 
 
-client.run(TOKEN)
+client.run("X")
