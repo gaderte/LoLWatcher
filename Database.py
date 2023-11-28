@@ -1,36 +1,28 @@
 import mysql.connector
 
-class Database(object):
-    db = None
-    cursor = None
+class Database:
 
     def __init__(self):
         try:
-            self.db = mysql.connector.connect(host='X',
-                                              user='X',
-                                              password='X',
-                                              database='X')
+            self.db = mysql.connector.connect(host="X",
+                                              user="X",
+                                              password="X",
+                                              database="X")
             self.cursor = self.db.cursor(buffered=True)
         except Exception as e:
             print(e)
 
-    def InitializeServer(self, guildid, cim, rtp):
-        request = "UPDATE serveurs SET channelIdMessage=%s, roleToPing=%s " \
-                  "WHERE guildId=%s"
-        params = [cim, rtp, guildid]
+    def addServeur(self, guildid, guildname, cim, rtp):
+        request = "INSERT INTO serveurs (guildID, guildName, channelIdMessage, roleToPing) " \
+                  "VALUES (%s, %s, %s, %s)"
+        params = [guildid, guildname, cim, rtp]
         self.cursor.execute(request, params)
         self.db.commit()
 
-    def GetServInfoByID(self, guildid):
-        request = "SELECT * FROM serveurs WHERE guildID = %s"
-        params = [guildid]
-        self.cursor.execute(request, params)
-        return self.cursor.fetchone()
-
-    def addServeur(self, guildid, guildname, cim, rtp):
-        request = "INSERT INTO serveurs (guildID, guildName, channelIdMessage, roleToPing) "\
-                  "VALUES (%s, %s, %s, %s)"
-        params = [guildid, guildname, cim, rtp]
+    def initializeServer(self, guildid, cim, rtp):
+        request = "UPDATE serveurs SET channelIdMessage=%s, roleToPing=%s " \
+                  "WHERE guildId=%s"
+        params = [cim, rtp, guildid]
         self.cursor.execute(request, params)
         self.db.commit()
 
@@ -40,31 +32,10 @@ class Database(object):
         self.cursor.execute(request, params)
         self.db.commit()
 
-    def removeAllJoueurs(self, guildid):
-        r1 = "SELECT * FROM joueurs;"
-        self.cursor.execute(r1)
-        j = self.cursor.fetchall()
-        enc_ids = []
-        for jr in j:
-            enc_ids.append(jr[0])
-        dup = [x for i, x in enumerate(enc_ids) if x in enc_ids[:i]]
-        del_list = []
-        for joueur in j:
-            if joueur[0] not in dup and joueur[7] == guildid:
-                del_list.append(joueur[0])
-        if del_list:
-            r2 = "DELETE FROM classement WHERE joueur IN ({});".format(", ".join(del_list))
-            self.cursor.execute(r2)
-            self.db.commit()
-        r3 = "DELETE FROM joueurs WHERE guildID = %s"
-        p2 = [guildid]
-        self.cursor.execute(r3, p2)
-        self.db.commit()
-
-    def addJoueur(self, encryptedid, summonername, tier, rank, lps, guildid, member_id):
-        request = "INSERT INTO joueurs (EncryptedID, SummonerName, Tier, Rank, leaguePoints, " \
-                  "guildID, memberID) VALUES (%s, %s, %s, %s, %s, %s, %s)"
-        params = [encryptedid, summonername, tier, rank, lps, guildid, member_id]
+    def addJoueur(self, encryptedid, puuid, summonername, tier, rank, lps, lgp, guildid, member_id):
+        request = "INSERT INTO joueurs (EncryptedID, puuid, SummonerName, Tier, Rank, leaguePoints, lastgameplayed, " \
+                  "guildID, memberID) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)"
+        params = [encryptedid, puuid, summonername, tier, rank, lps, lgp, guildid, member_id]
         try:
             self.cursor.execute(request, params)
             self.db.commit()
@@ -72,24 +43,29 @@ class Database(object):
         except mysql.connector.errors.IntegrityError:
             return 2
 
-    def GetJoueurFromMemberId(self, memberID):
-        request = "SELECT * FROM joueurs WHERE memberID = %s"
-        params = [memberID]
-        self.cursor.execute(request, params)
-        return self.cursor.rowcount, self.cursor.fetchall()
-
-    def RemoveJoueur(self, guildid, member_id):
-        request = "DELETE FROM joueurs WHERE guildID=%s AND memberID=%s"
-        params = [guildid, member_id]
+    def deleteJoueurByMemberID(self, member_id, guild_id):
+        request = "DELETE FROM joueurs WHERE memberID=%s AND guildID=%s"
+        params = [member_id, guild_id]
         self.cursor.execute(request, params)
         self.db.commit()
+        return self.cursor.rowcount
 
-    def updateJoueur(self, playerid, summonername, tier, rank, lps):
-        request = "UPDATE joueurs SET SummonerName=%s, Tier=%s, Rank=%s, leaguePoints=%s"\
-                  " WHERE EncryptedID=%s"
-        params = [summonername, tier, rank, lps, playerid]
+    def UpdatePlayerRecover(self, compteur):
+        request = "SELECT * FROM joueurs, serveurs WHERE joueurs.guildID = serveurs.guildID ORDER BY " \
+                  "joueurs.EncryptedID "
+        if compteur % 2 == 0:
+            request += "DESC LIMIT 80"
+        else:
+            request += "ASC LIMIT 80"
+        self.cursor.execute(request)
+        result = self.cursor.fetchall()
+        return result
+
+    def GetServInfoByID(self, guildid):
+        request = "SELECT * FROM serveurs WHERE guildID = %s"
+        params = [guildid]
         self.cursor.execute(request, params)
-        self.db.commit()
+        return self.cursor.fetchone()
 
     def recoverAllGuilds(self):
         request = "SELECT * FROM serveurs WHERE channelIdMessage != 0"
@@ -103,60 +79,33 @@ class Database(object):
         resultats = self.cursor.fetchall()
         return resultats
 
-    def GetPlayerInfo(self, guildid, summonername):
-        request = "SELECT * FROM joueurs WHERE guildID=%s and SummonerName=%s"
-        params = [guildid, summonername]
+    def GetJoueurFromMemberId(self, memberID):
+        request = "SELECT * FROM joueurs WHERE memberID = %s"
+        params = [memberID]
         self.cursor.execute(request, params)
-        result = self.cursor.fetchone()
-        return result
+        return self.cursor.rowcount, self.cursor.fetchall()
 
-    def GetPlayerInfoDiscord(self, guildid, discordid):
-        request = "SELECT * FROM joueurs WHERE guildID=%s and memberID=%s"
-        params = [guildid, discordid]
-        self.cursor.execute(request, params)
-        result = self.cursor.fetchone()
-        return result
-
-    def UpdatePlayerRecover(self):
-        request = "SELECT * FROM joueurs, serveurs WHERE joueurs.guildID = serveurs.guildID;"
-        self.cursor.execute(request)
-        result = self.cursor.fetchall()
-        return result
-
-    def AddClassement(self, encryptedid):
-        request = "INSERT INTO classement VALUES (%s, %s)"
-        params = [encryptedid, 0]
-        try:
-            self.cursor.execute(request, params)
-            self.db.commit()
-            return self.cursor.rowcount
-        except mysql.connector.errors.IntegrityError:
-            return 2
-
-    def DeleteClassement(self, EncryptedID):
-        request = "DELETE FROM classement WHERE joueur = %s"
-        params = [EncryptedID]
+    def RemoveJoueur(self, guildid, member_id):
+        request = "DELETE FROM joueurs WHERE guildID=%s AND memberID=%s"
+        params = [guildid, member_id]
         self.cursor.execute(request, params)
         self.db.commit()
 
-    def UpdateWinClassement(self, encryptedid):
-        request = "UPDATE classement SET nbrWin = nbrWin + 1 WHERE joueur = %s"
-        params = [encryptedid]
-        self.cursor.execute(request, params)
-        self.db.commit()
-        return self.cursor.rowcount
-
-    def ResetClassement(self):
-        request = "UPDATE classement SET nbrWin = 0"
-        self.cursor.execute(request)
-        self.db.commit()
-
-    def GetClassement(self, guildid):
-        request = "SELECT joueurs.SummonerName, joueurs.memberID, classement.nbrWin, serveurs.channelIdMessage " \
-                  "FROM classement INNER JOIN joueurs ON joueurs.EncryptedID = classement.joueur INNER JOIN serveurs " \
-                  "ON serveurs.guildID = joueurs.guildID WHERE joueurs.guildID = %s ORDER BY classement.nbrWin DESC" \
-                  " LIMIT 3;"
+    def removeAllJoueurs(self, guildid):
+        request = "DELETE FROM joueurs WHERE guildID=%s"
         params = [guildid]
         self.cursor.execute(request, params)
-        result = self.cursor.fetchall()
-        return result
+        self.db.commit()
+
+    def updateMatchID(self, guildid, memberid, gameid):
+        request = "UPDATE joueurs SET lastgameplayed=%s WHERE guildID=%s AND memberID=%s"
+        params = [gameid, guildid, memberid]
+        self.cursor.execute(request, params)
+        self.db.commit()
+
+    def updateJoueur(self, playerid, summonername, tier, rank, lps, gameid, guildid):
+        request = "UPDATE joueurs SET SummonerName=%s, Tier=%s, Rank=%s, leaguePoints=%s, lastgameplayed=%s"\
+                  " WHERE EncryptedID=%s AND guildID=%s"
+        params = [summonername, tier, rank, lps, gameid, playerid, guildid]
+        self.cursor.execute(request, params)
+        self.db.commit()
