@@ -53,6 +53,6 @@ if a player leave your guild => clear from players list
 
 /!\ Before adding, make sure you finished your placements games /!\
 
-Contact me on Discord if needed : DRX Atlas#6180
+Contact me on Discord if needed : atlasdxs
 
 Enjoy
